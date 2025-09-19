@@ -1,0 +1,3 @@
+Relatório de turno
+Total de decolagens na fila: 0
+Total de pousos na fila: 1

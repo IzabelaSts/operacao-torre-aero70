@@ -1,0 +1,11 @@
+# Ambiente virtual
+.venv/
+
+# Logs e filas temporárias
+logs/
+dados/fila_decolagem.txt
+dados/fila_pouso.txt
+
+# Arquivos temporários do editor
+*.pyc
+*~

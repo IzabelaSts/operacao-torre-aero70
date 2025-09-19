@@ -1,0 +1,11 @@
+=== Relatório do Turno ===
+Data: 2025-09-19
+
+Voos autorizados:
+- [2025-09-19 18:12:22] AUTORIZADO: voo ALT123 em pista 10/28
+- [2025-09-19 18:14:17] AUTORIZADO: voo ALT901 em pista 10/28
+- [2025-09-19 18:14:31] AUTORIZADO: voo ALT901 em pista 10/28
+
+Voos negados:
+- [2025-09-19 18:12:43] NEGADO: visibilidade baixa (5KM), apenas 1 operação por vez
+- [2025-09-19 18:15:48] NEGADO: NOTAM ativa na pista 01/19 (MANUTENCAO) no horário 14:05

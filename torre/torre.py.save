@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+import argparse
+import os
+from datetime import datetime
+
+# --- Arquivos ---
+ARQ_PLANOS = "dados/planos_voo.csv"
+ARQ_PISTAS = "dados/pistas.txt"
+ARQ_FROTA = "dados/frota.csv"
+ARQ_PILOTOS = "dados/pilotos.csv"
+ARQ_METAR = "dados/metar.txt"
+ARQ_NOTAM = "dados/notam.txt"
+ARQ_FILA_DECOLAGEM = "dados/fila_decolagem.txt"
+ARQ_FILA_POUSO = "dados/fila_pouso.txt"
+ARQ_LOG = "logs/torre.log"
+
+# Histórico temporário de operações
+historico_operacoes = []
+
+# --- Funções auxiliares ---
+def log(msg):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(ARQ_LOG, "a") as f:
+        f.write(f"[{ts}] {msg}\n")
+
+def hora_para_minutos(hhmm):
+    if not hhmm:
+        return 0
+    h, m = map(int, hhmm.split(":"))
+    return h * 60 + m
+
+def ler_txt(arquivo):
+    if not os.path.exists(arquivo):
+        return []
+    with open(arquivo, "r") as f:
+        return [l.strip() for l in f if l.strip()]
+
+def salvar_fila(arquivo, lista_dict):
+    with open(arquivo, "w") as f:
+        for v in lista_dict:
+            f.write(f"{v['voo']};{v.get('etd','')};{v.get('eta','')};{v['prioridade']};{v.get('pista_atribuida','')}\n")
+
+def importar_dados():
+    print("Iniciando importação de dados...")
+    # Cria arquivos de fila vazios se não existirem
+    for f in [ARQ_FILA_DECOLAGEM, ARQ_FILA_POUSO, ARQ_LOG]:
+        if not os.path.exists(f):
+            open(f, "a").close()
+    print("Importação concluída e filas iniciais criadas.")
+
+def listar(por='prioridade'):
+    voos = []
+    with open(ARQ_PLANOS) as f:
+        next(f)  # pular cabeçalho
+        for linha in f:
+            partes = linha.strip().split(',')
+            voos.append({
+                'voo': partes[0],
+                'origem': partes[1],
+                'destino': partes[2],
+                'etd': partes[3],
+                'eta': partes[4],
+                'aeronave': partes[5],
+                'tipo': partes[6],
+                'prioridade': partes[7],
+                'pista_pref': partes[8]
+            })
+
+    tipo_prioridade = {'EMERGENCIA': 0, 'CARGA': 1, 'COMERCIAL': 2}
+    # Ordenação
+    if por == 'prioridade':
+        voos.sort(key=lambda v: (tipo_prioridade.get(v['tipo'],3), -int(v['prioridade']), hora_para_minutos(v['etd'])))
+    elif por == 'voo':
+        voos.sort(key=lambda v: v['voo'])
+    elif por == 'etd':
+        voos.sort(key=lambda v: hora_para_minutos(v['etd']))
+    elif por == 'tipo':
+        voos.sort(key=lambda v: tipo_prioridade.get(v['tipo'],3))
+
+    print(f"{'Voo':<7} {'Origem':<6} {'Destino':<6} {'ETD':<5} {'ETA':<5} {'Aeronave':<7} {'Tipo':<9} {'Prioridade':<9} {'Pista'}")
+    for v in voos:
+        print(f"{v['voo']:<7} {v['origem']:<6} {v['destino']:<6} {v['etd']:<5} {v['eta']:<5} {v['aeronave']:<7} {v['tipo']:<9} {v['prioridade']:<9} {v['pista_pref']}")
+
+def enfileirar(tipo, voo_codigo):
+    arquivo_fila = ARQ_FILA_DECOLAGEM if tipo == 'decolagem' else ARQ_FILA_POUSO
+    fila = ler_txt(arquivo_fila)
+    for linha in fila:
+        if linha.startswith(voo_codigo + ";"):
+            print(f"Voo {voo_codigo} já enfileirado")
+            return
+
+    # Busca dados do voo
+    voo_info = None
+    with open(ARQ_PLANOS) as f:
+        next(f)
+        for linha in f:
+            partes = linha.strip().split(',')
+            if partes[0] == voo_codigo:
+                voo_info = {
+                    'voo': partes[0],
+                    'etd': partes[3],
+                    'eta': partes[4],
+                    'prioridade': partes[7],
+                    'pista_atribuida': ''
+                }
+                break
+    if not voo_info:
+        print(f"Voo {voo_codigo} não encontrado")
+        return
+
+    # Adiciona à fila
+    fila.append(f"{voo_info['voo']};{voo_info['etd']};{voo_info['eta']};{voo_info['prioridade']};{voo_info['pista_atribuida']}")
+    with open(arquivo_fila, "w") as f:
+        for l in fila:
+            f.write(l + "\n")
+    print(f"Voo {voo_codigo} enfileirado para {tipo}")
+
+"Fila de {tipo} vazia")
+        return
+
+    # Pega primeiro voo
+    partes = fila.pop(0).split(';')
+    codigo_voo = partes[0]
+    hora_voo = partes[1] if tipo=='decolagem' else partes[2]
+
+    motivo_recusa = None
+
+# Checa NOTAM
+    for n in ler_txt(ARQ_NOTAM):
+        if f"PISTA {pista} FECHADA" in n:
+        partes = n.split()
+        # garante que exista o horário e que tenha '-' separando início/fim
+        if len(partes) >= 5 and '-' in partes[4]:
+            hora_inicio, hora_fim = partes[4].split('-')
+            hora_voo_min = hora_para_minutos(hora_voo)
+            inicio_min = hora_para_minutos(hora_inicio)
+            fim_min = hora_para_minutos(hora_fim)
+            if inicio_min <= hora_voo_min <= fim_min:
+                motivo_recusa = f"Pista {pista} fechada por NOTAM"
+                break
+
+
+    # Checa METAR (clima)
+    if not motivo_recusa:
+        for m in ler_txt(ARQ_METAR):
+            metar_hora = m[:5]
+            vis = int(m.split("VIS ")[1].split("KM")[0])
+            metar_min = hora_para_minutos(metar_hora)
+            hora_voo_min = hora_para_minutos(hora_voo)
+            if abs(metar_min - hora_voo_min) <= 30 and vis < 6:
+                motivo_recusa = "Clima restritivo (VIS < 6KM)"
+                break
+
+    if motivo_recusa:
+        resultado = f"NEGADO: {motivo_recusa}"
+        print(f"Voo {codigo_voo} {resultado}")
+        historico_operacoes.append(f"{codigo_voo}: {resultado}")
+        log(f"Voo {codigo_voo} {resultado}")
+        salvar_fila(arquivo_fila, [dict(zip(['voo','etd','eta','prioridade','pista_atribuida'], l.split(';'))) for l in fila])
+        return
+
+    # Autoriza
+    resultado = f"AUTORIZADO para {tipo} na pista {pista}"
+    print(f"Voo {codigo_voo} {resultado}")
+    historico_operacoes.append(f"{codigo_voo}: {resultado}")
+    log(f"Voo {codigo_voo} {resultado}")
+    salvar_fila(arquivo_fila, [dict(zip(['voo','etd','eta','prioridade','pista_atribuida'], [codigo_voo, *partes[1:3], partes[3], pista]))] + [dict(zip(['voo','etd','eta','prioridade','pista_atribuida'], l.split(';'))) for l in fila])
+
+def status():
+    print("Status das pistas e filas:")
+    for linha in ler_txt(ARQ_PISTAS):
+        print(linha)
+    dec = len(ler_txt(ARQ_FILA_DECOLAGEM))
+    pous = len(ler_txt(ARQ_FILA_POUSO))
+    print(f"Fila de decolagem: {dec} voos")
+    print(f"Fila de pouso: {pous} voos")
+
+def relatorio():
+    hoje = datetime.now().strftime("%Y%m%d")
+    arquivo = f"relatorios/operacao_{hoje}.txt"
+    with open(arquivo,"w") as f:
+        f.write("Resumo do turno:\n")
+        for l in historico_operacoes:
+            f.write(l + "\n")
+    print(f"Relatório gerado em {arquivo}")
+
+# --- CLI ---
+def main():
+    parser = argparse.ArgumentParser(description="Simulador Torre 1978")
+    subparsers = parser.add_subparsers(dest="comando")
+
+    subparsers.add_parser("importar-dados")
+    parser_listar = subparsers.add_parser("listar")
+    parser_listar.add_argument("--por", default="prioridade", choices=["voo","etd","tipo","prioridade"])
+
+    parser_enf = subparsers.add_parser("enfileirar")
+    parser_enf.add_argument("tipo", choices=["decolagem","pouso"])
+    parser_enf.add_argument("--voo", required=True)
+
+    parser_aut = subparsers.add_parser("autorizar")
+    parser_aut.add_argument("tipo", choices=["decolagem","pouso"])
+    parser_aut.add_argument("--pista", required=True)
+
+    subparsers.add_parser("status")
+    subparsers.add_parser("relatorio")
+
+    args = parser.parse_args()
+
+    if args.comando == "importar-dados":
+        importar_dados()
+    elif args.comando == "listar":
+        listar(args.por)
+    elif args.comando == "enfileirar":
+        enfileirar(args.tipo, args.voo)
+    elif args.comando == "autorizar":
+        autorizar(args.tipo, args.pista)
+    elif args.comando == "status":
+        status()
+    elif args.comando == "relatorio":
+        relatorio()
+    else:
+        parser.print_help()
+
+if __name__ == "__main__":
+    main()
