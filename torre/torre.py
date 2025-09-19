@@ -202,54 +202,16 @@ def status():
         print(f"  {n}")
 
 
-from pathlib import Path
-import datetime
-
-LOG_FILE = Path("logs/torre.log")
-RELATORIOS_DIR = Path("relatorios")
-
 def relatorio():
-    """Gera relatório simples com voos autorizados e negados com motivos."""
+    rel_file = REL_DIR / f"operacao_{datetime.now().strftime('%Y%m%d')}.txt"
+    REL_DIR.mkdir(parents=True, exist_ok=True)
+    with open(rel_file, "w") as f:
+        f.write("Relatório de turno\n")
+        f.write(f"Total de decolagens na fila: {len(read_txt_lines(FILA_DECOLAGEM))}\n")
+        f.write(f"Total de pousos na fila: {len(read_txt_lines(FILA_POUSO))}\n")
+    print(f"Relatório gerado: {rel_file}")
+    log("Relatório gerado.")
 
-    # Lê logs
-    logs = LOG_FILE.read_text().splitlines()
-
-    voos_autorizados = []
-    voos_negados = []
-
-    for line in logs:
-        if "AUTORIZADO" in line:
-            voos_autorizados.append(line)
-        elif "NEGADO" in line:
-            voos_negados.append(line)
-
-    # Cria conteúdo do relatório
-    data_atual = datetime.datetime.now().strftime("%Y-%m-%d")
-    conteudo = []
-    conteudo.append(f"=== Relatório do Turno ===")
-    conteudo.append(f"Data: {data_atual}\n")
-
-    conteudo.append("Voos autorizados:")
-    if voos_autorizados:
-        for v in voos_autorizados:
-            conteudo.append(f"- {v}")
-    else:
-        conteudo.append("- Nenhum")
-
-    conteudo.append("\nVoos negados:")
-    if voos_negados:
-        for v in voos_negados:
-            conteudo.append(f"- {v}")
-    else:
-        conteudo.append("- Nenhum")
-
-    # Salva arquivo
-    RELATORIOS_DIR.mkdir(exist_ok=True)
-    nome_arquivo = f"operacao_{data_atual}.txt"
-    arquivo = RELATORIOS_DIR / nome_arquivo
-    arquivo.write_text("\n".join(conteudo))
-
-    print(f"Relatório gerado: {arquivo}")
 
 def main():
     parser = argparse.ArgumentParser(description="Operação TORRE 1978 CLI")
@@ -290,4 +252,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
